@@ -1,222 +1,183 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { 
-  Swords, 
+  ChefHat, 
   Key, 
   Settings, 
-  Sparkles, 
-  HelpCircle, 
-  Award, 
+  Calendar, 
+  Utensils, 
+  ShoppingCart, 
   RefreshCw, 
-  Check, 
-  ChevronRight, 
-  MessageSquareCode, 
-  Trash2,
-  Lock
+  CheckSquare, 
+  AlertTriangle,
+  DollarSign,
+  Coffee,
+  Sun,
+  Moon,
+  Clock,
+  Check,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 const PRESETS = [
   {
-    name: "Explain Recursion (Wizard vs. Scientist)",
-    challenge: "Explain the concept of recursion to a 10-year-old child.",
-    promptA: {
-      system: "You are Merlin the wizard. You explain complex programming topics using analogies of magic, spells, potions, and enchanted castles. Keep your language whimsical and magical.",
-      user: "Merlin, please explain what 'recursion' is to a young apprentice."
-    },
-    promptB: {
-      system: "You are a professional science communicator who writes books for kids. You explain concepts using simple, clear, real-world examples, diagrams, and step-by-step logic without jargon.",
-      user: "Explain the concept of recursion to a 10-year-old using a real-world example."
-    }
+    label: "Super Busy Workday",
+    context: "I have back-to-back meetings from 9 AM to 6 PM. I only have 15 minutes to cook per meal, want high energy, and need something easy to clean up."
   },
   {
-    name: "AI Startup Slogan (Hype vs. Minimalist)",
-    challenge: "Generate a tagline/slogan for a new AI startup that helps developers write tests automatically.",
-    promptA: {
-      system: "You are an aggressive tech-startup marketing guru. Use hype words, bold claims, high energy, and emojis. Make it sound revolutionary and fast-paced.",
-      user: "Write 3 slogans for my AI-testing startup."
-    },
-    promptB: {
-      system: "You are a minimalist copywriter who believes in simplicity, clarity, and understatement. Avoid jargon, hype, and exclamation marks. Focus on direct utility and peace of mind.",
-      user: "Write 3 slogans for my AI-testing startup."
-    }
+    label: "Intense Workout Day",
+    context: "I am hitting the gym for leg day this afternoon. I need high-protein meals, fast-digesting carbs post-workout, and plenty of hydration."
   },
   {
-    name: "Refactor Python Code (Performance vs. Readability)",
-    challenge: "Refactor a nested loop function to find prime numbers to make it better.",
-    promptA: {
-      system: "You are a hardcore competitive programmer who prioritizes raw performance, micro-optimizations, bitwise operations, and minimal lines of code. Explain your performance tricks.",
-      user: "Optimize a basic prime finding function in Python."
-    },
-    promptB: {
-      system: "You are a software architect who prioritizes clean code principles, readability, descriptive variable names, docstrings, and comprehensive inline comments. Make it maintainable.",
-      user: "Refactor a basic prime finding function in Python."
-    }
+    label: "Lazy Sunday & Cozy Vibes",
+    context: "I am staying in all day, reading books. I want comforting, slow-cooked or warm foods, don't mind spending time cooking, but want a moderate budget."
   }
 ];
 
 function App() {
-  // Config state
+  // Configuration
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [showConfig, setShowConfig] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState(0);
-
-  // Battle states
-  const [challenge, setChallenge] = useState(PRESETS[0].challenge);
-  
-  // Prompt A states
-  const [modelA, setModelA] = useState('gemini-2.5-flash');
-  const [tempA, setTempA] = useState(0.7);
-  const [systemA, setSystemA] = useState(PRESETS[0].promptA.system);
-  const [userA, setUserA] = useState(PRESETS[0].promptA.user);
-  
-  // Prompt B states
-  const [modelB, setModelB] = useState('gemini-2.5-flash');
-  const [tempB, setTempB] = useState(0.7);
-  const [systemB, setSystemB] = useState(PRESETS[0].promptB.system);
-  const [userB, setUserB] = useState(PRESETS[0].promptB.user);
-
-  // Output/Status states
-  const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState('');
-  const [outputA, setOutputA] = useState('');
-  const [outputB, setOutputB] = useState('');
-  const [verdict, setVerdict] = useState(null);
   const [error, setError] = useState('');
 
-  // Handle Preset change
-  const applyPreset = (index) => {
-    setSelectedPreset(index);
-    const preset = PRESETS[index];
-    setChallenge(preset.challenge);
-    setSystemA(preset.promptA.system);
-    setUserA(preset.promptA.user);
-    setSystemB(preset.promptB.system);
-    setUserB(preset.promptB.user);
-    setOutputA('');
-    setOutputB('');
-    setVerdict(null);
+  // Form Inputs
+  const [dayContext, setDayContext] = useState(PRESETS[0].context);
+  const [budgetLimit, setBudgetLimit] = useState('Medium'); // Low, Medium, High
+  const [dietary, setDietary] = useState('None'); // None, Vegan, Vegetarian, Gluten-Free, Keto
+
+  // Output States
+  const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
+  const [mealPlan, setMealPlan] = useState(null);
+
+  // Local interaction states
+  const [checkedSteps, setCheckedSteps] = useState({});
+  const [checkedGrocery, setCheckedGrocery] = useState({});
+
+  // Toggle checklist items
+  const toggleStep = (id) => {
+    setCheckedSteps(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleGrocery = (id) => {
+    setCheckedGrocery(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Handle Preset Select
+  const selectPreset = (context) => {
+    setDayContext(context);
+    setMealPlan(null);
     setError('');
   };
 
-  // Save API Key
-  const handleSaveKey = (key) => {
-    setApiKey(key.trim());
-    localStorage.setItem('gemini_api_key', key.trim());
-    setShowConfig(false);
-  };
-
-  // Run the battle
-  const runBattle = async () => {
+  // Run the Meal Planner AI logic
+  const generatePlan = async () => {
     if (!apiKey) {
       setShowConfig(true);
-      setError('Please add a Gemini API Key to run battles.');
+      setError('Please configure your Gemini API Key in the top right to generate a plan.');
       return;
     }
 
     setLoading(true);
     setError('');
-    setVerdict(null);
-    setOutputA('');
-    setOutputB('');
+    setMealPlan(null);
+    setLoadingStep('Analyzing your day & cooking preferences...');
 
     const ai = new GoogleGenAI({ apiKey });
 
     try {
-      // Step 1: Run Prompt A
-      setLoadingStep('Summoning Player A...');
-      const responseA = await ai.models.generateContent({
-        model: modelA,
-        contents: userA,
-        config: {
-          systemInstruction: systemA || undefined,
-          temperature: tempA,
-        }
-      });
-      const textA = responseA.text;
-      setOutputA(textA);
+      const prompt = `
+You are an expert personal chef and meal planner.
+Generate a structured personal cooking plan and to-do list based on the user's day.
 
-      // Step 2: Run Prompt B
-      setLoadingStep('Summoning Player B...');
-      const responseB = await ai.models.generateContent({
-        model: modelB,
-        contents: userB,
-        config: {
-          systemInstruction: systemB || undefined,
-          temperature: tempB,
-        }
-      });
-      const textB = responseB.text;
-      setOutputB(textB);
+User's Day Context:
+"${dayContext}"
 
-      // Step 3: Run AI Referee
-      setLoadingStep('AI Referee evaluating submissions...');
-      
-      const refereePrompt = `
-You are an expert AI Prompt Engineer and Judge. You are refereeing a "Prompt Battle".
-Your task is to analyze the performance of two different prompts (Prompt A and Prompt B) that were run against a specific Challenge.
+Budget Level preference: ${budgetLimit}
+Dietary constraints: ${dietary}
 
-Here is the Challenge:
-"${challenge}"
+Create a realistic plan including breakfast, lunch, and dinner. The recipes must strictly fit their schedule and budget.
 
---- PLAYER A CONFIG ---
-System Instruction: "${systemA}"
-User Query: "${userA}"
-Generated Response A:
-"""
-${textA}
-"""
-
---- PLAYER B CONFIG ---
-System Instruction: "${systemB}"
-User Query: "${userB}"
-Generated Response B:
-"""
-${textB}
-"""
-
-Evaluate both outputs rigorously across these criteria:
-1. Creativity (Score 0-100)
-2. Relevance to Challenge (Score 0-100)
-3. Clarity and Execution (Score 0-100)
-4. Overall Quality (Score 0-100)
-
-Provide your response in JSON format exactly like this:
+Provide the response in JSON format matching this schema:
 {
-  "scores": {
-    "promptA": {
-      "creativity": 85,
-      "relevance": 90,
-      "clarity": 80,
-      "overall": 85
+  "meals": {
+    "breakfast": {
+      "name": "Name of breakfast dish",
+      "prepTime": "e.g. 10 mins",
+      "cookTime": "e.g. 5 mins",
+      "description": "Short appetizing description.",
+      "instructions": [
+        "Step 1 to cook",
+        "Step 2 to cook"
+      ]
     },
-    "promptB": {
-      "creativity": 90,
-      "relevance": 95,
-      "clarity": 90,
-      "overall": 92
+    "lunch": {
+      "name": "Name of lunch dish",
+      "prepTime": "e.g. 15 mins",
+      "cookTime": "e.g. 10 mins",
+      "description": "Short description.",
+      "instructions": [
+        "Step 1",
+        "Step 2"
+      ]
+    },
+    "dinner": {
+      "name": "Name of dinner dish",
+      "prepTime": "e.g. 20 mins",
+      "cookTime": "e.g. 20 mins",
+      "description": "Short description.",
+      "instructions": [
+        "Step 1",
+        "Step 2"
+      ]
     }
   },
-  "verdict": "Player A" or "Player B" or "Draw",
-  "reasoning": "Detailed justification on why the winner won, comparing specific stylistic choices, structure, and effectiveness.",
-  "critiqueA": "Constructive feedback for Prompt A.",
-  "critiqueB": "Constructive feedback for Prompt B."
+  "todoList": [
+    {
+      "id": "todo_1",
+      "task": "e.g. Chop vegetables for lunch ahead of time",
+      "time": "Morning (8:00 AM)"
+    },
+    {
+      "id": "todo_2",
+      "task": "e.g. Marinate chicken/tofu during lunch break",
+      "time": "Afternoon (1:00 PM)"
+    }
+  ],
+  "groceryList": [
+    { "item": "Ingredient A", "amount": "e.g. 200g" },
+    { "item": "Ingredient B", "amount": "e.g. 2 units" }
+  ],
+  "substitutions": [
+    { "original": "Ingredient A", "alternative": "Vegan/Gluten-Free/Cheaper alternative", "reason": "Why swap it" }
+  ],
+  "budgetAnalysis": {
+    "estimatedCost": "e.g. $15 - $20",
+    "feasibility": "Good / Moderate / High",
+    "tips": "Tips to save money based on these ingredients."
+  }
 }
 `;
 
-      const refereeResponse = await ai.models.generateContent({
+      setLoadingStep('Designing customized menu and recipes...');
+      
+      const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: refereePrompt,
+        contents: prompt,
         config: {
           responseMimeType: 'application/json',
-          temperature: 0.2
+          temperature: 0.3
         }
       });
 
-      const refereeResult = JSON.parse(refereeResponse.text);
-      setVerdict(refereeResult);
+      const data = JSON.parse(response.text);
+      setMealPlan(data);
+      setCheckedSteps({});
+      setCheckedGrocery({});
     } catch (err) {
       console.error(err);
-      setError(err.message || 'An error occurred during the battle.');
+      setError(err.message || 'Failed to generate plan. Please verify your API key and connection.');
     } finally {
       setLoading(false);
       setLoadingStep('');
@@ -225,202 +186,99 @@ Provide your response in JSON format exactly like this:
 
   return (
     <div className="app-container">
-      {/* Top Header */}
+      {/* Header */}
       <header className="main-header">
         <div className="header-brand">
           <div className="logo-glow">
-            <Swords className="logo-icon" />
+            <ChefHat className="logo-icon" />
           </div>
-          <h1>PROMPT WARS <span className="badge-beta">ARENA</span></h1>
+          <h1>CHEF PLANNER <span className="badge-beta">TO-DO</span></h1>
         </div>
 
         <div className="header-actions">
-          {/* Preset Selector */}
-          <div className="preset-selector">
-            <span className="preset-label">Battle Preset:</span>
-            <select 
-              value={selectedPreset} 
-              onChange={(e) => applyPreset(Number(e.target.value))}
-              className="preset-select"
-            >
-              {PRESETS.map((preset, idx) => (
-                <option key={idx} value={idx}>{preset.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Key Button */}
           <button 
             onClick={() => setShowConfig(true)} 
             className={`btn-key ${apiKey ? 'active' : ''}`}
           >
             <Key className="btn-icon" />
-            {apiKey ? 'API Key Configured' : 'Configure API Key'}
+            {apiKey ? 'Gemini Configured' : 'Configure Gemini Key'}
           </button>
         </div>
       </header>
 
-      {/* Main Layout */}
-      <main className="arena-grid">
+      {/* Main Section */}
+      <main className="planner-grid">
         
-        {/* Challenge Section */}
-        <section className="challenge-card">
+        {/* Left Input Sidebar */}
+        <section className="input-card">
           <div className="card-header">
-            <Sparkles className="challenge-icon text-glow-yellow" />
-            <h2>The Challenge Criteria</h2>
+            <Calendar className="header-icon text-glow-green" />
+            <h2>Plan Your Day</h2>
           </div>
-          <p className="card-subtitle">Define the goal that both prompts are competing to achieve:</p>
-          <textarea
-            value={challenge}
-            onChange={(e) => setChallenge(e.target.value)}
-            className="challenge-input"
-            rows="2"
-            placeholder="e.g. Write a humorous marketing email introducing a smart toaster."
-          />
-        </section>
-
-        {/* The Combatants */}
-        <div className="fighters-row">
           
-          {/* Fighter A Panel */}
-          <section className="fighter-panel fighter-a">
-            <div className="panel-header indigo-glow">
-              <span className="badge fighter-badge-a">PLAYER A</span>
-              <div className="model-config">
-                <select 
-                  value={modelA} 
-                  onChange={(e) => setModelA(e.target.value)}
-                  className="model-select"
-                >
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                </select>
-                <div className="temp-slider">
-                  <span>Temp: {tempA}</span>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="2" 
-                    step="0.1" 
-                    value={tempA} 
-                    onChange={(e) => setTempA(Number(e.target.value))} 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="editor-group">
-              <label>System Instruction (Persona/Rules)</label>
-              <textarea
-                value={systemA}
-                onChange={(e) => setSystemA(e.target.value)}
-                placeholder="Set background rules, persona or tone constraints..."
-                rows="3"
-                className="code-textarea"
-              />
-            </div>
-
-            <div className="editor-group">
-              <label>User Query / Prompt</label>
-              <textarea
-                value={userA}
-                onChange={(e) => setUserA(e.target.value)}
-                placeholder="What user query is sent to the model..."
-                rows="4"
-                className="code-textarea highlighted"
-              />
-            </div>
-
-            <div className="output-preview">
-              <div className="preview-label">Submission Output A</div>
-              <div className="preview-content">
-                {outputA ? (
-                  <pre>{outputA}</pre>
-                ) : (
-                  <div className="empty-state">Waiting for battle to start...</div>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Fighter B Panel */}
-          <section className="fighter-panel fighter-b">
-            <div className="panel-header pink-glow">
-              <span className="badge fighter-badge-b">PLAYER B</span>
-              <div className="model-config">
-                <select 
-                  value={modelB} 
-                  onChange={(e) => setModelB(e.target.value)}
-                  className="model-select"
-                >
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                </select>
-                <div className="temp-slider">
-                  <span>Temp: {tempB}</span>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="2" 
-                    step="0.1" 
-                    value={tempB} 
-                    onChange={(e) => setTempB(Number(e.target.value))} 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="editor-group">
-              <label>System Instruction (Persona/Rules)</label>
-              <textarea
-                value={systemB}
-                onChange={(e) => setSystemB(e.target.value)}
-                placeholder="Set background rules, persona or tone constraints..."
-                rows="3"
-                className="code-textarea"
-              />
-            </div>
-
-            <div className="editor-group">
-              <label>User Query / Prompt</label>
-              <textarea
-                value={userB}
-                onChange={(e) => setUserB(e.target.value)}
-                placeholder="What user query is sent to the model..."
-                rows="4"
-                className="code-textarea highlighted"
-              />
-            </div>
-
-            <div className="output-preview">
-              <div className="preview-label">Submission Output B</div>
-              <div className="preview-content">
-                {outputB ? (
-                  <pre>{outputB}</pre>
-                ) : (
-                  <div className="empty-state">Waiting for battle to start...</div>
-                )}
-              </div>
-            </div>
-          </section>
-
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="error-banner">
-            <p>{error}</p>
+          <div className="input-field-group">
+            <label className="field-label">How does your day look?</label>
+            <textarea
+              value={dayContext}
+              onChange={(e) => setDayContext(e.target.value)}
+              className="text-input"
+              rows="4"
+              placeholder="e.g. Busy morning meetings, going to the gym at 5 PM, want a quick high-protein dinner..."
+            />
           </div>
-        )}
 
-        {/* Action Button */}
-        <div className="action-row">
+          <div className="presets-row">
+            {PRESETS.map((p, idx) => (
+              <button 
+                key={idx} 
+                onClick={() => selectPreset(p.context)}
+                className="btn-preset"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="selectors-grid">
+            <div className="input-field-group">
+              <label className="field-label">Budget Range</label>
+              <select 
+                value={budgetLimit}
+                onChange={(e) => setBudgetLimit(e.target.value)}
+                className="select-input"
+              >
+                <option value="Low">Low (Under $15)</option>
+                <option value="Medium">Medium ($15 - $35)</option>
+                <option value="High">High (Gourmet / Open)</option>
+              </select>
+            </div>
+
+            <div className="input-field-group">
+              <label className="field-label">Dietary Preference</label>
+              <select 
+                value={dietary}
+                onChange={(e) => setDietary(e.target.value)}
+                className="select-input"
+              >
+                <option value="None">No restriction</option>
+                <option value="Vegetarian">Vegetarian</option>
+                <option value="Vegan">Vegan</option>
+                <option value="Gluten-Free">Gluten-Free</option>
+                <option value="Keto">Keto</option>
+              </select>
+            </div>
+          </div>
+
+          {error && (
+            <div className="error-banner">
+              <p>{error}</p>
+            </div>
+          )}
+
           <button 
-            onClick={runBattle} 
-            disabled={loading} 
-            className={`btn-battle ${loading ? 'loading' : ''}`}
+            onClick={generatePlan}
+            disabled={loading}
+            className={`btn-action ${loading ? 'loading' : ''}`}
           >
             {loading ? (
               <>
@@ -429,108 +287,224 @@ Provide your response in JSON format exactly like this:
               </>
             ) : (
               <>
-                <Swords className="btn-icon" />
-                <span>INITIATE PROMPT BATTLE</span>
+                <ChefHat className="btn-icon" />
+                <span>Generate Smart Meal Plan & To-Do List</span>
               </>
             )}
           </button>
+        </section>
+
+        {/* Right Output Area */}
+        <div className="results-container">
+          {mealPlan ? (
+            <div className="meal-plan-layout">
+              
+              {/* Meal Cards */}
+              <section className="results-card">
+                <div className="card-header">
+                  <Utensils className="header-icon text-glow-green" />
+                  <h2>Today's Menu</h2>
+                </div>
+
+                <div className="meals-grid">
+                  {/* Breakfast */}
+                  <div className="meal-box">
+                    <div className="meal-title-row">
+                      <Coffee className="meal-icon text-indigo" />
+                      <h3>Breakfast</h3>
+                    </div>
+                    <h4 className="meal-name">{mealPlan.meals.breakfast.name}</h4>
+                    <p className="meal-desc">{mealPlan.meals.breakfast.description}</p>
+                    <div className="meal-times">
+                      <span>Prep: {mealPlan.meals.breakfast.prepTime}</span>
+                      <span>Cook: {mealPlan.meals.breakfast.cookTime}</span>
+                    </div>
+                    <ul className="meal-steps">
+                      {mealPlan.meals.breakfast.instructions.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Lunch */}
+                  <div className="meal-box">
+                    <div className="meal-title-row">
+                      <Sun className="meal-icon text-yellow" />
+                      <h3>Lunch</h3>
+                    </div>
+                    <h4 className="meal-name">{mealPlan.meals.lunch.name}</h4>
+                    <p className="meal-desc">{mealPlan.meals.lunch.description}</p>
+                    <div className="meal-times">
+                      <span>Prep: {mealPlan.meals.lunch.prepTime}</span>
+                      <span>Cook: {mealPlan.meals.lunch.cookTime}</span>
+                    </div>
+                    <ul className="meal-steps">
+                      {mealPlan.meals.lunch.instructions.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Dinner */}
+                  <div className="meal-box">
+                    <div className="meal-title-row">
+                      <Moon className="meal-icon text-pink" />
+                      <h3>Dinner</h3>
+                    </div>
+                    <h4 className="meal-name">{mealPlan.meals.dinner.name}</h4>
+                    <p className="meal-desc">{mealPlan.meals.dinner.description}</p>
+                    <div className="meal-times">
+                      <span>Prep: {mealPlan.meals.dinner.prepTime}</span>
+                      <span>Cook: {mealPlan.meals.dinner.cookTime}</span>
+                    </div>
+                    <ul className="meal-steps">
+                      {mealPlan.meals.dinner.instructions.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
+              {/* Interactive Cooking To-Do List */}
+              <section className="results-card">
+                <div className="card-header">
+                  <CheckSquare className="header-icon text-glow-green" />
+                  <h2>Cooking To-Do List</h2>
+                </div>
+                <p className="card-subtitle">Complete these preparatory tasks throughout your day to stay on track:</p>
+                <div className="todo-list">
+                  {mealPlan.todoList.map((item) => (
+                    <div 
+                      key={item.id} 
+                      onClick={() => toggleStep(item.id)}
+                      className={`todo-item ${checkedSteps[item.id] ? 'completed' : ''}`}
+                    >
+                      <div className="checkbox-box">
+                        {checkedSteps[item.id] && <Check className="check-icon" />}
+                      </div>
+                      <div className="todo-text-block">
+                        <span className="todo-task">{item.task}</span>
+                        <span className="todo-time">{item.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Grocery & Budget Details */}
+              <div className="grocery-budget-row">
+                
+                {/* Grocery list */}
+                <section className="results-card flex-1">
+                  <div className="card-header">
+                    <ShoppingCart className="header-icon text-glow-green" />
+                    <h2>Grocery Checklist</h2>
+                  </div>
+                  <div className="grocery-list">
+                    {mealPlan.groceryList.map((g, idx) => (
+                      <div 
+                        key={idx} 
+                        onClick={() => toggleGrocery(idx)}
+                        className={`grocery-item ${checkedGrocery[idx] ? 'completed' : ''}`}
+                      >
+                        <div className="checkbox-box">
+                          {checkedGrocery[idx] && <Check className="check-icon" />}
+                        </div>
+                        <span className="grocery-name">{g.item}</span>
+                        <span className="grocery-amount">{g.amount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Budget Analysis */}
+                <section className="results-card flex-1">
+                  <div className="card-header">
+                    <DollarSign className="header-icon text-glow-yellow" />
+                    <h2>Budget & Feasibility</h2>
+                  </div>
+                  <div className="budget-container">
+                    <div className="budget-metric">
+                      <span className="budget-label">Estimated Cost:</span>
+                      <span className="budget-value">{mealPlan.budgetAnalysis.estimatedCost}</span>
+                    </div>
+                    <div className="budget-metric">
+                      <span className="budget-label">Feasibility Level:</span>
+                      <span className="budget-badge">{mealPlan.budgetAnalysis.feasibility}</span>
+                    </div>
+                    <div className="budget-tips">
+                      <h4>Saving Tips:</h4>
+                      <p>{mealPlan.budgetAnalysis.tips}</p>
+                    </div>
+                  </div>
+                </section>
+
+              </div>
+
+              {/* Ingredient Substitutions */}
+              <section className="results-card">
+                <div className="card-header">
+                  <AlertTriangle className="header-icon text-glow-yellow" />
+                  <h2>Ingredient Substitutions</h2>
+                </div>
+                <div className="subs-table-container">
+                  <table className="subs-table">
+                    <thead>
+                      <tr>
+                        <th>Original Ingredient</th>
+                        <th>Healthy / Cheaper Alternative</th>
+                        <th>Reason for Swap</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mealPlan.substitutions.map((sub, idx) => (
+                        <tr key={idx}>
+                          <td className="font-semibold">{sub.original}</td>
+                          <td className="text-highlight">{sub.alternative}</td>
+                          <td className="text-muted-row">{sub.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+            </div>
+          ) : (
+            <div className="results-empty-state">
+              <ChefHat className="large-empty-icon animate-pulse" />
+              <h3>Awaiting Your Day's Context</h3>
+              <p>Fill out the planning context on the left and hit generate to plan your custom meals, groceries, prep to-dos, and budget analysis!</p>
+            </div>
+          )}
         </div>
-
-        {/* Referee Verdict Panel */}
-        {verdict && (
-          <section className="verdict-card">
-            <div className="verdict-banner">
-              <Award className="verdict-crown-icon animate-pulse" />
-              <h2>AI Referee Verdict</h2>
-            </div>
-            
-            <div className="verdict-main-box">
-              <div className="winner-announcement">
-                <span className="winner-label">Winner:</span>
-                <span className={`winner-name ${verdict.verdict.toLowerCase().replace(' ', '-')}`}>
-                  {verdict.verdict}
-                </span>
-              </div>
-              <p className="verdict-reasoning">
-                <strong>Justification:</strong> {verdict.reasoning}
-              </p>
-            </div>
-
-            {/* Criteria Breakdown Grid */}
-            <div className="scores-table-container">
-              <table className="scores-table">
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    <th className="player-col player-a-col">Player A</th>
-                    <th className="player-col player-b-col">Player B</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Creativity</td>
-                    <td className="score-val">{verdict.scores.promptA.creativity}/100</td>
-                    <td className="score-val">{verdict.scores.promptB.creativity}/100</td>
-                  </tr>
-                  <tr>
-                    <td>Relevance</td>
-                    <td className="score-val">{verdict.scores.promptA.relevance}/100</td>
-                    <td className="score-val">{verdict.scores.promptB.relevance}/100</td>
-                  </tr>
-                  <tr>
-                    <td>Clarity & Execution</td>
-                    <td className="score-val">{verdict.scores.promptA.clarity}/100</td>
-                    <td className="score-val">{verdict.scores.promptB.clarity}/100</td>
-                  </tr>
-                  <tr className="overall-row">
-                    <td>Overall Score</td>
-                    <td className="score-val overall-score-a">{verdict.scores.promptA.overall}/100</td>
-                    <td className="score-val overall-score-b">{verdict.scores.promptB.overall}/100</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Critiques */}
-            <div className="critique-columns">
-              <div className="critique-box critique-a">
-                <h3>Coach Critique for A</h3>
-                <p>{verdict.critiqueA}</p>
-              </div>
-              <div className="critique-box critique-b">
-                <h3>Coach Critique for B</h3>
-                <p>{verdict.critiqueB}</p>
-              </div>
-            </div>
-          </section>
-        )}
 
       </main>
 
-      {/* Key Config Modal */}
+      {/* Settings Modal */}
       {showConfig && (
         <div className="modal-backdrop">
           <div className="modal-card">
             <div className="modal-header">
               <Settings className="modal-icon" />
-              <h3>Gemini API Configuration</h3>
+              <h3>Configure Gemini API Key</h3>
             </div>
             
             <div className="modal-body">
               <p className="modal-desc">
-                Enter your <strong>Gemini API Key</strong> to authenticate your prompts directly in the browser. 
-                Your key is stored safely only in your local browser storage (`localStorage`).
+                Input your <strong>Gemini API Key</strong> to authenticate calls. Your key is stored safely only in your browser storage (`localStorage`).
               </p>
               
               <div className="key-setup-hint">
-                <p>💡 <strong>Don't have a key?</strong> You can get a free key in 10 seconds from Google AI Studio:</p>
+                <p>💡 You can get a free key instantly from Google AI Studio:</p>
                 <a 
                   href="https://aistudio.google.com/" 
                   target="_blank" 
                   rel="noreferrer"
                   className="studio-link"
                 >
-                  Get Key from Google AI Studio &rarr;
+                  Open Google AI Studio &rarr;
                 </a>
               </div>
 
@@ -569,7 +543,7 @@ Provide your response in JSON format exactly like this:
 
       {/* Footer */}
       <footer className="arena-footer">
-        <p>Google Prompt Wars Event &bull; Scaffolded with love by Antigravity</p>
+        <p>Cooking To-Do List Meal Planner &bull; Google Prompt Wars Event Submission</p>
       </footer>
     </div>
   );
