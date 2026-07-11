@@ -1,0 +1,21 @@
+# Ignore Google Cloud SDK installation
+google-cloud-sdk/
+
+# Ignore Node.js dependencies
+node_modules/
+**/node_modules/
+
+# OS Files
+.DS_Store
+Thumps.db
+
+# Build/Dist directories
+dist/
+**/dist/
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
