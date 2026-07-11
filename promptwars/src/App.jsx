@@ -26,6 +26,10 @@ import {
   Key,
   Settings
 } from 'lucide-react';
+import BudgetWidget from './components/BudgetWidget';
+import GroceryChecklist from './components/GroceryChecklist';
+import SubstitutionsView from './components/SubstitutionsView';
+import BatchShortcutsView from './components/BatchShortcutsView';
 
 const STEP_COUNT = 4;
 
@@ -70,6 +74,7 @@ function App() {
   // Interactive client-side states (for "Swap and See" live editing)
   const [editableGroceryList, setEditableGroceryList] = useState([]);
   const [substitutions, setSubstitutions] = useState([]);
+  const [batchPrepTips, setBatchPrepTips] = useState([]);
   const [checkedItems, setCheckedItems] = useState({});
 
   // Trigger meal plan generation
@@ -77,6 +82,8 @@ function App() {
     setLoading(true);
     setError('');
     setMealPlan(null);
+    setSubstitutions([]);
+    setBatchPrepTips([]);
     setLoadingStep('Planning your recipes...');
 
     const resolvedDietary = dietary === 'Custom' ? customDietary : dietary;
@@ -162,6 +169,9 @@ Format your response strictly as a JSON object matching this schema:
       "alternative": "Swapped item",
       "reason": "Clear explanation of flavor/texture/nutritional equivalence."
     }
+  ],
+  "batchPrepTips": [
+    "Identify when two dishes share a base ingredient or technique, and write a specific tip on how the user can prep them together to save time."
   ]
 }
 
@@ -184,6 +194,7 @@ In the "groceryList", set "onHand" to true for ingredients the user explicitly s
       // Save data to states
       setMealPlan(data.meals);
       setSubstitutions(data.substitutions || []);
+      setBatchPrepTips(data.batchPrepTips || []);
       
       // Prep editable grocery list
       const preparedList = (data.groceryList || []).map((item, index) => ({
@@ -273,6 +284,7 @@ In the "groceryList", set "onHand" to true for ingredients the user explicitly s
     setMealPlan(null);
     setEditableGroceryList([]);
     setSubstitutions([]);
+    setBatchPrepTips([]);
     setCheckedItems({});
     setError('');
   };
@@ -599,184 +611,33 @@ In the "groceryList", set "onHand" to true for ingredients the user explicitly s
                 </section>
 
                 {/* Substitutions */}
-                {substitutions.length > 0 && (
-                  <section className="plan-card">
-                    <div className="section-title-row">
-                      <TrendingDown className="title-icon yellow" />
-                      <h3>Smart Substitutions</h3>
-                    </div>
-                    <p className="section-desc">Healthy dietary swaps and cost-saving alternatives for today's menu:</p>
-                    
-                    <div className="subs-grid">
-                      {substitutions.map((sub, idx) => (
-                        <div key={idx} className="sub-box">
-                          <div className="sub-header">
-                            <span className="sub-original">{sub.original}</span>
-                            <ArrowRight className="sub-arrow" />
-                            <span className="sub-alternative">{sub.alternative}</span>
-                          </div>
-                          <p className="sub-reason">{sub.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                <SubstitutionsView substitutions={substitutions} />
+
+                {/* Batch Prep Shortcuts */}
+                <BatchShortcutsView batchPrepTips={batchPrepTips} />
 
               </div>
 
               {/* Right Column: Interactive Grocery & Budget Feasibility */}
               <div className="right-panel-sidebar">
                 
-                {/* Live Cost & Budget Meter */}
-                <section className="sidebar-card budget-widget">
-                  <h3>Budget Feasibility</h3>
-                  
-                  {/* Circular/SVG Budget Gauge */}
-                  <div className="gauge-container">
-                    <svg viewBox="0 0 100 55" className="gauge-svg">
-                      {/* Base Track */}
-                      <path 
-                        d="M 10 50 A 40 40 0 0 1 90 50" 
-                        fill="none" 
-                        stroke="#272a31" 
-                        strokeWidth="8" 
-                        strokeLinecap="round" 
-                      />
-                      {/* Live Value Track */}
-                      <path 
-                        d="M 10 50 A 40 40 0 0 1 90 50" 
-                        fill="none" 
-                        stroke={
-                          budgetFeasibility.status === 'Over budget' ? '#f87171' : 
-                          budgetFeasibility.status === 'On budget' ? '#fbbf24' : '#34d399'
-                        } 
-                        strokeWidth="8" 
-                        strokeLinecap="round" 
-                        strokeDasharray={126}
-                        strokeDashoffset={Math.max(0, 126 - (126 * Math.min(1, budgetFeasibility.totalBuyCost / budget)))}
-                        className="gauge-progress-path"
-                      />
-                    </svg>
-                    
-                    <div className="gauge-overlay-labels">
-                      <span className="gauge-cost">{currencySymbol}{budgetFeasibility.totalBuyCost.toFixed(2)}</span>
-                      <span className="gauge-max">of {currencySymbol}{budget} limit</span>
-                    </div>
-                  </div>
+                <BudgetWidget 
+                  budgetFeasibility={budgetFeasibility}
+                  budget={budget}
+                  remainingCostToBuy={remainingCostToBuy}
+                  currencySymbol={currencySymbol}
+                />
 
-                  {/* Status Indicator */}
-                  <div className={`status-pill ${budgetFeasibility.status.toLowerCase().replace(' ', '-')}`}>
-                    <span>{budgetFeasibility.status}</span>
-                  </div>
-                  
-                  <p className="feasibility-desc">{budgetFeasibility.description}</p>
-
-                  {/* Math Breakdown */}
-                  <div className="math-breakdown-box">
-                    <div className="math-row">
-                      <span>Shopping List Cost:</span>
-                      <span>{currencySymbol}{budgetFeasibility.totalBuyCost.toFixed(2)}</span>
-                    </div>
-                    <div className="math-row">
-                      <span>Value from Pantry:</span>
-                      <span className="green-text">+{currencySymbol}{budgetFeasibility.totalHaveCost.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  {/* Swap Suggestion Tip */}
-                  {budgetFeasibility.suggestedSwaps.length > 0 && (
-                    <div className="savings-suggestions-card">
-                      <h4>💡 Over-Budget Swaps to Fix:</h4>
-                      <ul>
-                        {budgetFeasibility.suggestedSwaps.map((swap, idx) => (
-                          <li key={idx}>
-                            {swap.tip}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </section>
-
-                {/* Interactive Grocery Checklist */}
-                <section className="sidebar-card grocery-checklist-widget">
-                  <div className="checklist-hdr-row">
-                    <h3>Grocery List</h3>
-                    <span className="cost-counter-badge">
-                      {currencySymbol}{remainingCostToBuy} remaining
-                    </span>
-                  </div>
-                  
-                  {/* Live Add Item */}
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const nameInput = e.target.elements.gName;
-                      const amtInput = e.target.elements.gAmt;
-                      addGroceryItem(nameInput.value, amtInput.value);
-                      nameInput.value = '';
-                      amtInput.value = '';
-                    }}
-                    className="add-grocery-form"
-                  >
-                    <input name="gName" type="text" placeholder="Add ingredient..." required className="add-input" />
-                    <input name="gAmt" type="text" placeholder="Qty" className="add-qty-input" />
-                    <button type="submit" className="btn-add-item"><Plus className="add-icon" /></button>
-                  </form>
-
-                  {/* Categorized Grocery List */}
-                  <div className="grocery-categories-stack">
-                    {['Produce', 'Protein', 'Dairy', 'Pantry', 'Other'].map(cat => {
-                      const itemsInCat = editableGroceryList.filter(item => item.category === cat);
-                      if (itemsInCat.length === 0) return null;
-                      
-                      return (
-                        <div key={cat} className="grocery-category-group">
-                          <h4>{cat}</h4>
-                          <div className="category-items-list">
-                            {itemsInCat.map((item) => {
-                              const isChecked = !!checkedItems[item.id];
-                              
-                              return (
-                                <div key={item.id} className={`grocery-row-item ${isChecked ? 'checked' : ''} ${item.onHand ? 'pantry-have' : ''}`}>
-                                  {/* Strike-off Checkbox */}
-                                  <label className="checkbox-label-container">
-                                    <input 
-                                      type="checkbox" 
-                                      checked={isChecked}
-                                      onChange={() => setCheckedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                      disabled={item.onHand}
-                                    />
-                                    <span className="custom-checkmark"></span>
-                                  </label>
-
-                                  <div className="grocery-item-details">
-                                    <span className="grocery-item-name">{item.item}</span>
-                                    <span className="grocery-item-amount">{item.amount}</span>
-                                  </div>
-
-                                  {/* On Hand status badge */}
-                                  <button 
-                                    onClick={() => toggleOnHand(item.id)} 
-                                    className={`btn-pantry-toggle ${item.onHand ? 'have' : 'need'}`}
-                                    title={item.onHand ? "I already have this in my pantry" : "I need to purchase this"}
-                                  >
-                                    {item.onHand ? 'have it' : 'need to buy'}
-                                  </button>
-
-                                  {/* Delete button */}
-                                  <button onClick={() => deleteGroceryItem(item.id)} className="btn-delete-grocery">
-                                    <Trash2 className="trash-icon" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
+                <GroceryChecklist 
+                  editableGroceryList={editableGroceryList}
+                  checkedItems={checkedItems}
+                  setCheckedItems={setCheckedItems}
+                  toggleOnHand={toggleOnHand}
+                  deleteGroceryItem={deleteGroceryItem}
+                  addGroceryItem={addGroceryItem}
+                  remainingCostToBuy={remainingCostToBuy}
+                  currencySymbol={currencySymbol}
+                />
 
               </div>
 

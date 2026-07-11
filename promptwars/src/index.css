@@ -1108,3 +1108,42 @@ h1, h2, h3, h4, h5 {
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* Batch Prep Shortcuts Styling */
+.shortcuts-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shortcut-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background-color: rgba(245, 158, 11, 0.04);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.shortcut-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.shortcut-bullet {
+  color: #f59e0b; /* Amber */
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+}
+
+.shortcut-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

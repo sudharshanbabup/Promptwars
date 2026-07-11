@@ -121,6 +121,9 @@ Format your response strictly as a JSON object matching this schema:
       "alternative": "Swapped item",
       "reason": "Clear explanation of flavor/texture/nutritional equivalence."
     }
+  ],
+  "batchPrepTips": [
+    "Identify when two dishes share a base ingredient or technique, and write a specific tip on how the user can prep them together to save time."
   ]
 }
 
